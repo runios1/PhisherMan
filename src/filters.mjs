@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import fetch from "node-fetch";
 import { promises as dns } from "dns";
+import { getRatingsForDomain } from "./db_query.mjs";
 
 dotenv.config();
 
@@ -88,12 +89,15 @@ async function performDNSCheck(domain) {
     console.log(`Performing DNS check for domain: ${domain}`);
 
     // Resolve the domain to an IP address
-    const addresses = await dns.resolve(domain);
+    const addresses = await dns.resolve(domain, "CNAME");
     if (addresses.length === 0) {
       throw new Error("No IP address found for the domain.");
     }
     const resolvedIP = addresses[0]; // Take the first resolved IP
-    console.log(`Resolved IP address: ${resolvedIP}`);
+    console.log(`Resolved IP addresses: ${addresses}`);
+    for (const resolvedIP of addresses) {
+      console.log(`Checking resolved IP: ${resolvedIP}`);
+    }
 
     // Perform reverse DNS lookup on the resolved IP
     const reverseDomains = await dns.reverse(resolvedIP);
@@ -114,9 +118,21 @@ async function performDNSCheck(domain) {
 }
 
 async function calculateUserRating(domain) {
-  // Mocked example: Replace with actual rating retrieval from your database
-  const userRating = 3.2; // Example rating (out of 5)
-  return userRating < 3 ? "Low User Rating" : "Safe";
+  try {
+    const ratings = await getRatingsForDomain(domain);
+    const userRating =
+      ratings.negative_reports + ratings.positive_reports !== 0
+        ? ratings.positive_reports /
+          (ratings.negative_reports + ratings.positive_reports)
+        : 1; // If no reports at all return 1. If no positive reports return 0.
+
+    console.log(`User rating: ${userRating}`);
+
+    return userRating < 0.6 ? "Low User Rating" : "Safe";
+  } catch (err) {
+    console.error(err);
+    throw new Error("Failed to calculate user rating");
+  }
 }
 
 export async function evaluateSite(url) {
@@ -127,7 +143,7 @@ export async function evaluateSite(url) {
   results.push(checkDomainAge(data));
   results.push(checkServerLocation(data));
   results.push(checkTopLevelDomain(domain));
-  results.push(await performDNSCheck(domain));
+  // results.push(await performDNSCheck(domain));
   results.push(await calculateUserRating(domain));
 
   // Print detailed results
@@ -135,15 +151,16 @@ export async function evaluateSite(url) {
 
   // Aggregate results
   const suspiciousFilters = results.filter((result) => result !== "Safe");
-  return {
-    status: suspiciousFilters.length > 0 ? "Suspicious" : "Safe",
-    details: suspiciousFilters,
-  };
+  return ((results.length - suspiciousFilters.length) / 4) * 100;
+  // return {
+  //   status: ((results.length - suspiciousFilters.length) / 4) * 100,
+  //   details: suspiciousFilters,
+  // };
 }
 
 // Test: Run evaluation on google.com
-(async function testGoogle() {
-  console.log("Running evaluation for google.com...");
-  const result = await evaluateSite("https://google.com");
-  console.log("Evaluation Result for google.com:", result);
-})();
+// (async function testGoogle() {
+//   console.log("Running evaluation for google.com...");
+//   const result = await evaluateSite("https://google.com");
+//   console.log("Evaluation Result for google.com:", result);
+// })();

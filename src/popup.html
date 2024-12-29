@@ -3,23 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Phishing Detector</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 10px;
-      }
-      button {
-        margin-top: 10px;
-        padding: 5px 10px;
-      }
-    </style>
+    <title>Phisherman</title>
   </head>
   <body>
-    <h3>Phishing Detector</h3>
-    <p>Current site status: <span id="status">Checking...</span></p>
-    <button id="rate-safe">Rate as Safe</button>
-    <button id="rate-phishing">Rate as Phishing</button>
+    <h1>Phisherman</h1>
+    <p>Enter a string (URL) to send to the server:</p>
+    <!-- <input type="text" id="inputString" placeholder="Enter a string" /> -->
+    <!-- <button onclick="sendToServer()">Send</button>
+    <button onclick="reportMalicious()">Report as Malicious</button>
+    <button onclick="reportSafe()">Report as Safe</button> -->
+    <button id="sendButton">Send</button>
+    <button id="maliciousButton">Report as Malicious</button>
+    <button id="safeButton">Report as Safe</button>
+    <p id="response"></p>
+
     <script src="popup.js"></script>
   </body>
 </html>
