@@ -18,7 +18,7 @@ PhisherMan is a Chrome extension designed to help users identify phishing websit
 ### Server
 - Install node js
 - Open powershell in the path of the project
-- Run node src/server.mjs
+- Run `node src/server.mjs`
 ### Front-end
 - Clone or download the repository to your local machine.
 - Open Chrome and navigate to `chrome://extensions/`.
