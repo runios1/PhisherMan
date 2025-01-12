@@ -13,7 +13,10 @@ async function sendToServer() {
       currentWindow: true,
     });
     console.log("sending url: " + tab.url);
-    inputString = tab.url;
+    const responseElement = document.getElementById("response");
+    responseElement.style.color = "";
+    responseElement.textContent = "Waiting for server response";
+    const inputString = tab.url;
     try {
       const response = await fetch("http://localhost:3000/checkURL", {
         method: "POST",
@@ -22,11 +25,20 @@ async function sendToServer() {
       });
 
       const data = await response.json();
-      document.getElementById("response").textContent = data.message;
+      if (!data.message || data.error) {
+        responseElement.textContent = data.error || "Error occurred";
+        responseElement.style.color = "red";
+      } else {
+        responseElement.textContent = data.message + "%";
+        if (data.message <= 50) responseElement.style.color = "red";
+        else if (data.message <= 80) responseElement.style.color = "orange";
+        else responseElement.style.color = "green";
+      }
       console.log("got result from server.");
     } catch (error) {
-      document.getElementById("response").textContent =
-        "Error: Unable to connect to the server.";
+      const responseElement = document.getElementById("response");
+      responseElement.textContent = "Error: Unable to connect to the server.";
+      responseElement.style.color = "red";
       console.error(error);
     }
   })();
@@ -38,6 +50,8 @@ async function reportMalicious() {
       active: true,
       currentWindow: true,
     });
+    const responseElement = document.getElementById("response");
+    responseElement.style.color = "";
     console.log("rating url mal: " + tab.url);
     inputString = tab.url;
     try {
@@ -48,7 +62,7 @@ async function reportMalicious() {
       });
 
       const data = await response.json();
-      document.getElementById("response").textContent = data.message;
+      responseElement.textContent = data.message;
     } catch (error) {
       document.getElementById("response").textContent =
         "Error: Unable to connect to the server.";
@@ -64,6 +78,8 @@ async function reportSafe() {
       currentWindow: true,
     });
     console.log("rating url safe: " + tab.url);
+    const responseElement = document.getElementById("response");
+    responseElement.style.color = "";
     inputString = tab.url;
     try {
       const response = await fetch("http://localhost:3000/reportSafe", {
@@ -73,7 +89,7 @@ async function reportSafe() {
       });
 
       const data = await response.json();
-      document.getElementById("response").textContent = data.message;
+      responseElement.textContent = data.message;
     } catch (error) {
       document.getElementById("response").textContent =
         "Error: Unable to connect to the server.";
@@ -81,3 +97,13 @@ async function reportSafe() {
     }
   })();
 }
+
+document.getElementById("maliciousButton").addEventListener("click", () => {
+  displayResult("This website has been reported as malicious.", "malicious");
+  alert("Reported successfully!");
+});
+
+document.getElementById("safeButton").addEventListener("click", () => {
+  displayResult("This website has been reported as safe.", "safe");
+  alert("Reported successfully!");
+});

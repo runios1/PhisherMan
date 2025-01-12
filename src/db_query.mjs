@@ -141,12 +141,3 @@ function insertRating(db, domain, flag) {
     );
   });
 }
-
-// // Example Usage
-// updateOrInsertRating("example.com", false)
-//   .then(() => console.log("Rating updated or inserted successfully."))
-//   .catch((err) => console.error("Error:", err.message));
-
-// updateOrInsertRating("google.com", true)
-//   .then(() => console.log("Rating updated or inserted successfully."))
-//   .catch((err) => console.error("Error:", err.message));

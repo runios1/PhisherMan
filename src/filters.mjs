@@ -1,9 +1,51 @@
 import dotenv from "dotenv";
 import fetch from "node-fetch";
-import { promises as dns } from "dns";
 import { getRatingsForDomain } from "./db_query.mjs";
 
 dotenv.config();
+
+async function checkUrlWithVirusTotal(domain) {
+  const apiKey = process.env.virustotal_key;
+  try {
+    const response = await fetch(
+      `https://www.virustotal.com/api/v3/domains/${domain}`,
+      {
+        method: "GET",
+        headers: {
+          "x-apikey": apiKey,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const maliciousVotes =
+      data.data.attributes.last_analysis_stats.malicious || 0;
+    const suspiciousVotes =
+      data.data.attributes.last_analysis_stats.suspicious || 0;
+
+    const output =
+      (maliciousVotes + suspiciousVotes) /
+      (data.data.attributes.last_analysis_stats.harmless +
+        data.data.attributes.last_analysis_stats.malicious +
+        data.data.attributes.last_analysis_stats.suspicious +
+        data.data.attributes.last_analysis_stats.timeout +
+        data.data.attributes.last_analysis_stats.undetected);
+
+    const score = Math.max(
+      0,
+      1 - 0.333 * maliciousVotes - 0.15 * suspiciousVotes
+    );
+
+    return score;
+  } catch (error) {
+    console.error("Error checking URL with VirusTotal:", error);
+    return { error: true };
+  }
+}
 
 // Function to query WHOIS API for domain creation date
 export async function apiRequest(domain) {
@@ -38,18 +80,23 @@ export function checkDomainAge(data) {
   try {
     let domainCreationDate;
     // Fetch the domain creation
-    if (data.WhoisRecord && data.WhoisRecord.createdDate) {
-      domainCreationDate = new Date(data.WhoisRecord.createdDate);
+    if (
+      data.WhoisRecord &&
+      data.WhoisRecord.registryData.createdDateNormalized
+    ) {
+      domainCreationDate = new Date(
+        data.WhoisRecord.registryData.createdDateNormalized
+      );
     } else {
-      // Recoed doesn't have creation date data
-      return "Suspicious (New Domain)";
+      // Record doesn't have creation date data
+      return 0;
     }
 
     // Calculate domain age in years
     const ageInYears =
       (Date.now() - domainCreationDate.getTime()) / (1000 * 60 * 60 * 24 * 365);
 
-    return ageInYears < 1 ? "Suspicious (New Domain)" : "Safe";
+    return Math.min(1, ageInYears);
   } catch (error) {
     console.error("Error checking domain age:", error);
     return "Unknown (Error occurred)";
@@ -57,64 +104,44 @@ export function checkDomainAge(data) {
 }
 
 export function checkServerLocation(data) {
-  const suspiciousRegions = ["IN", "NG", "RU"];
+  const suspiciousRegions = [
+    "IN",
+    "NG",
+    "RU",
+    "ML",
+    "GA",
+    "CN",
+    "IR",
+    "PK",
+    "AF",
+  ];
+
   let domainCountryCode;
   if (
+    data.WhoisRecord &&
+    data.WhoisRecord.registryData.registrant &&
+    data.WhoisRecord.registryData.registrant.countryCode
+  ) {
+    domainCountryCode = data.WhoisRecord.registryData.registrant.countryCode;
+  } else if (
     data.WhoisRecord &&
     data.WhoisRecord.registrant &&
     data.WhoisRecord.registrant.countryCode
   ) {
     domainCountryCode = data.WhoisRecord.registrant.countryCode;
   } else {
-    // Recoed doesn't have location data
-    return "Suspicious Location";
+    // Record doesn't have location data
+    return 1;
   }
 
-  return suspiciousRegions.includes(domainCountryCode)
-    ? "Suspicious Location"
-    : "Safe";
+  return suspiciousRegions.includes(domainCountryCode) ? 0 : 1;
 }
 
 export function checkTopLevelDomain(domain) {
   const auspiciousTLDs = [".sx", ".cc", ".lc", ".cn"]; // According to www.spamhaus.org
   const tld = domain.substring(domain.lastIndexOf("."));
 
-  return auspiciousTLDs.includes(tld)
-    ? "Suspicious (Unusual Top-Level Domain)"
-    : "Safe";
-}
-
-async function performDNSCheck(domain) {
-  try {
-    console.log(`Performing DNS check for domain: ${domain}`);
-
-    // Resolve the domain to an IP address
-    const addresses = await dns.resolve(domain, "CNAME");
-    if (addresses.length === 0) {
-      throw new Error("No IP address found for the domain.");
-    }
-    const resolvedIP = addresses[0]; // Take the first resolved IP
-    console.log(`Resolved IP addresses: ${addresses}`);
-    for (const resolvedIP of addresses) {
-      console.log(`Checking resolved IP: ${resolvedIP}`);
-    }
-
-    // Perform reverse DNS lookup on the resolved IP
-    const reverseDomains = await dns.reverse(resolvedIP);
-    if (reverseDomains.length === 0) {
-      throw new Error("No reverse DNS entry found for the IP.");
-    }
-    const backResolvedDomain = reverseDomains[0]; // Take the first reverse entry
-    console.log(`Back resolved domain: ${reverseDomains}`);
-
-    // Compare the original domain with the back-resolved domain
-    return reverseDomains.includes(domain)
-      ? "Safe"
-      : "Suspicious (DNS Mismatch)";
-  } catch (error) {
-    console.error("Error performing DNS check:", error.message);
-    return "Unknown (Error occurred)";
-  }
+  return auspiciousTLDs.includes(tld) ? 0 : 1;
 }
 
 async function calculateUserRating(domain) {
@@ -128,7 +155,7 @@ async function calculateUserRating(domain) {
 
     console.log(`User rating: ${userRating}`);
 
-    return userRating < 0.6 ? "Low User Rating" : "Safe";
+    return userRating;
   } catch (err) {
     console.error(err);
     throw new Error("Failed to calculate user rating");
@@ -137,30 +164,24 @@ async function calculateUserRating(domain) {
 
 export async function evaluateSite(url) {
   const domain = new URL(url).hostname;
-  const data = await apiRequest(domain);
-  // Combine filters
   const results = [];
+  results.push(await checkUrlWithVirusTotal(domain));
+
+  const data = await apiRequest(domain);
   results.push(checkDomainAge(data));
   results.push(checkServerLocation(data));
   results.push(checkTopLevelDomain(domain));
-  // results.push(await performDNSCheck(domain));
   results.push(await calculateUserRating(domain));
 
   // Print detailed results
   console.log("Evaluation Results:", results);
 
-  // Aggregate results
-  const suspiciousFilters = results.filter((result) => result !== "Safe");
-  return ((results.length - suspiciousFilters.length) / 4) * 100;
-  // return {
-  //   status: ((results.length - suspiciousFilters.length) / 4) * 100,
-  //   details: suspiciousFilters,
-  // };
-}
+  const weights = [60, 8, 8, 8, 16];
+  let score = 0;
 
-// Test: Run evaluation on google.com
-// (async function testGoogle() {
-//   console.log("Running evaluation for google.com...");
-//   const result = await evaluateSite("https://google.com");
-//   console.log("Evaluation Result for google.com:", result);
-// })();
+  for (let i = 0; i < results.length; i++) {
+    score += results[i] * weights[i];
+  }
+
+  return score;
+}

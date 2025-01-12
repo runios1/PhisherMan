@@ -7,9 +7,21 @@ const app = express();
 app.use(cors());
 app.use(json());
 
+function isValidUrl(url) {
+  try {
+    const parsedUrl = new URL(url);
+    return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
+  } catch (error) {
+    return false;
+  }
+}
+
 app.post("/checkURL", async (req, res) => {
   console.log("will be checked!");
   const url = req.body.inputString;
+  if (!isValidUrl(url)) {
+    return res.status(400).json({ error: "Invalid URL" });
+  }
   try {
     const rate = await evaluateSite(url);
     res.json({ message: rate });
@@ -24,7 +36,6 @@ app.post("/checkURL", async (req, res) => {
 app.post("/reportMalicious", (req, res) => {
   const { inputString: url } = req.body;
   try {
-    // Log the report (replace with actual database or storage logic if needed)
     console.log(`URL '${url}' reported as malicious`);
 
     updateOrInsertRating(url, false);
@@ -42,7 +53,6 @@ app.post("/reportMalicious", (req, res) => {
 app.post("/reportSafe", (req, res) => {
   const { inputString: url } = req.body;
   try {
-    // Log the report (replace with actual database or storage logic if needed)
     console.log(`URL '${url}' reported as safe`);
 
     updateOrInsertRating(url, true);
