@@ -14,21 +14,21 @@ browsing speed.
 ## Features
 - **Evaluate Website Security:** Press a button to check if the current website is suspicious or safe.
 - **Dynamic Safety Score:** The extension returns a percentage-based safety score:
-  - **80%+**: Relatively safe
-  - **50%-80%**: Relatively unsafe (warning)
-  - **<50%**: Dangerous
+  - **80%+**: Relatively safe (green)
+  - **50%-80%**: Relatively unsafe (orange)
+  - **<50%**: Dangerous (red)
 - **User Reporting:**
   - Report websites as "Safe"
   - Report websites as "Malicious"
 - **Dynamic Feedback:** Get real-time feedback on the website's status.
 
 ## Installation
+- Clone the repository to your local machine.
 ### Server
-- Install node js
-- Open powershell in the path of the project
-- Run `node src/server.mjs`
+- Install node js.
+- Open powershell in the path of the project.
+- Run `node src/server.mjs`.
 ### Front-end
-- Clone or download the repository to your local machine.
 - Open Chrome and navigate to `chrome://extensions/`.
 - Enable **Developer mode** using the toggle in the top-right corner.
 - Click **Load unpacked** and select the project folder.
