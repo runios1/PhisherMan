@@ -24,6 +24,9 @@ browsing speed.
 
 ## Installation
 - Clone the repository to your local machine.
+- In the main folder add a new file named `.env` and add the following API keys:
+`whois_key = #Your API key from WHOIS
+virustotal_key = #Your API key from virustotal`
 ### Server
 - Install node js.
 - Open powershell in the path of the project.
